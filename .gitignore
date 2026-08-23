@@ -1,0 +1,7 @@
+.env
+seen_jobs.db
+connections.csv
+__pycache__/
+*.pyc
+.venv/
+venv/
