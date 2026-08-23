@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # --- CONFIGURATION ---
-SEARCH_TERM = "Supply Chain Analyst"
+SEARCH_TERM = "Supply Chain"
 LOCATION = "Boston, MA"
 MIN_ALERT_SCORE = 7  # Only email opportunities meeting or exceeding this threshold
 SENDER_EMAIL = os.getenv("ALERT_EMAIL_SENDER")
@@ -143,7 +143,7 @@ def run_pipeline():
         google_search_term=f"{SEARCH_TERM} in {LOCATION}",
         location=LOCATION,
         results_wanted=40,
-        hours_old=12,
+        hours_old=24,
         country_only="USA",
         linkedin_fetch_description=True
     )
