@@ -20,7 +20,7 @@ SENDER_PASSWORD = os.getenv("ALERT_EMAIL_PASSWORD")
 RECIPIENT_EMAIL = os.getenv("ALERT_EMAIL_RECIPIENT")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
-# Complete, unabridged candidate profile matching interface.py
+# Complete candidate profile
 MY_PROFILE = """
 PREETHI SRINIVASAN 
 Boston, MA | (617) 893-8446 | preesrini99@gmail.com | https://www.linkedin.com/in/preethi-srinivasan-8513221aa/ 
@@ -64,6 +64,28 @@ SKILLS
 TARGET ROLES
 Supply Chain Analyst, Procurement Analyst, Sourcing Specialist, Inventory Analyst, Procurement Specialist.
 """
+
+# --- HELPER FUNCTIONS ---
+def format_salary(row):
+    """Formats salary data into a readable string if available."""
+    min_sal = getattr(row, 'min_amount', None)
+    max_sal = getattr(row, 'max_amount', None)
+    interval = getattr(row, 'interval', None)
+
+    if pd.notna(min_sal) or pd.notna(max_sal):
+        if min_sal == max_sal:
+            salary_str = f"${min_sal:,.0f}"
+        elif pd.notna(min_sal) and pd.notna(max_sal):
+            salary_str = f"${min_sal:,.0f} - ${max_sal:,.0f}"
+        elif pd.notna(min_sal):
+            salary_str = f"${min_sal:,.0f}+"
+        else:
+            salary_str = f"Up to ${max_sal:,.0f}"
+
+        if pd.notna(interval) and interval:
+            salary_str += f" ({interval})"
+        return salary_str
+    return "Not listed"
 
 # --- DATABASE DEDUPLICATION ---
 def init_db():
@@ -115,7 +137,7 @@ def send_email_digest(matches):
         html_content += f"""
         <div style="margin-bottom: 20px; padding: 15px; border: 1px solid #e0e0e0; border-radius: 8px; background-color: #fafafa;">
             <h3 style="margin-top: 0; color: #111;">{job['title']} — <span style="color: #27ae60;">{job['score']}/10</span></h3>
-            <p style="margin: 5px 0;"><strong>Company:</strong> {job['company']} | <strong>Location:</strong> {job['location']} | <strong>Source:</strong> {job['site']}</p>
+            <p style="margin: 5px 0;"><strong>Company:</strong> {job['company']} | <strong>Location:</strong> {job['location']} | <strong>Salary:</strong> {job['salary']} | <strong>Source:</strong> {job['site']}</p>
             <p style="margin: 5px 0;"><strong>Top Match Reasons:</strong> {job['strengths']}</p>
             <p style="margin: 5px 0; color: #c0392b;"><strong>Identified Gaps:</strong> {job['gaps']}</p>
             <div style="margin-top: 10px;">
@@ -224,6 +246,7 @@ def run_pipeline():
                 "title": target_row["title"],
                 "company": target_row["company"],
                 "location": target_row["location"],
+                "salary": format_salary(target_row),
                 "site": str(target_row["site"]).replace("_jobs", "").capitalize(),
                 "job_url": target_row["job_url"],
                 "score": score,
