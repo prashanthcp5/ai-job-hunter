@@ -166,7 +166,6 @@ def run_pipeline():
         location=LOCATION,
         results_wanted=40,
         hours_old=24,
-        country_only="USA",
         linkedin_fetch_description=True
     )
 

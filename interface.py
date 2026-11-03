@@ -116,7 +116,6 @@ def fetch_and_clean_jobs(search_term, location, num_results, proxies_list=None):
             location=location,
             results_wanted=num_results, 
             hours_old=24,
-            country_only="USA",
             linkedin_fetch_description=True,
             proxies=proxies_list if proxies_list else None
         )
