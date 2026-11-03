@@ -7,6 +7,8 @@ import json
 import pandas as pd
 from jobspy import scrape_jobs
 from google import genai
+from google.genai import errors
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -114,6 +116,20 @@ def mark_job_sent(conn, job_url, title, company, score):
                    (job_url, title, company, score))
     conn.commit()
 
+# --- RETRY WRAPPER FOR AI CALLS ---
+@retry(
+    stop=stop_after_attempt(4),
+    wait=wait_exponential(multiplier=2, min=4, max=30),
+    retry=retry_if_exception_type((errors.ServerError, errors.APIError)),
+    reraise=True
+)
+def generate_evaluations(client, prompt):
+    return client.models.generate_content(
+        model="gemini-2.5-flash",
+        contents=prompt,
+        config={'response_mime_type': 'application/json'}
+    )
+
 # --- EMAIL DISPATCHER ---
 def send_email_digest(matches):
     if not matches:
@@ -159,17 +175,21 @@ def run_pipeline():
     conn = init_db()
     print("Fetching active listings...")
     
-    raw_jobs = scrape_jobs(
-        site_name=["indeed", "linkedin", "google"],
-        search_term=SEARCH_TERM,
-        google_search_term=f"{SEARCH_TERM} in {LOCATION}",
-        location=LOCATION,
-        results_wanted=40,
-        hours_old=24,
-        linkedin_fetch_description=True
-    )
+    try:
+        raw_jobs = scrape_jobs(
+            site_name=["indeed", "linkedin", "google"],
+            search_term=SEARCH_TERM,
+            google_search_term=f"{SEARCH_TERM} in {LOCATION}",
+            location=LOCATION,
+            results_wanted=40,
+            hours_old=24,
+            fetch_description=True
+        )
+    except Exception as e:
+        print(f"Scraping encountered an issue: {e}")
+        return
 
-    if raw_jobs.empty:
+    if raw_jobs is None or raw_jobs.empty:
         print("No jobs found in this cycle.")
         return
 
@@ -224,13 +244,13 @@ def run_pipeline():
     - 'gaps': concise explanation of actual experience/seniority gaps
     """
 
-    response = client.models.generate_content(
-        model="gemini-2.5-flash",
-        contents=prompt,
-        config={'response_mime_type': 'application/json'}
-    )
-    
-    results = json.loads(response.text.strip())
+    try:
+        response = generate_evaluations(client, prompt)
+        results = json.loads(response.text.strip())
+    except Exception as err:
+        print(f"Failed to generate evaluation from Gemini API after retries: {err}")
+        return
+
     matched_to_send = []
 
     for res in results:
